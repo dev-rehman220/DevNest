@@ -33,6 +33,21 @@ export default function PrayerTimeFinder() {
     return rawLabel.replaceAll("_", " ");
   };
 
+  const parseJsonResponse = async (response) => {
+    const contentType = response.headers.get("content-type") || "";
+    const rawBody = await response.text();
+
+    if (!contentType.toLowerCase().includes("application/json")) {
+      throw new Error("Server returned an unexpected response. Please try again.");
+    }
+
+    try {
+      return JSON.parse(rawBody);
+    } catch {
+      throw new Error("Server returned unreadable data. Please try again.");
+    }
+  };
+
   const resolveLocationLabel = async (lat, lon) => {
     try {
       const response = await fetch(
@@ -43,7 +58,7 @@ export default function PrayerTimeFinder() {
         return "";
       }
 
-      const payload = await response.json();
+      const payload = await parseJsonResponse(response);
 
       const cityName = payload.city || payload.locality || payload.localityInfo?.administrative?.[2]?.name || "";
       const regionName = payload.principalSubdivision || payload.countryName || "";
@@ -72,7 +87,7 @@ export default function PrayerTimeFinder() {
       const response = await fetch(
         `https://api.aladhan.com/v1/timingsByCity?city=${encodeURIComponent(cityName)}&country=&method=2`
       );
-      const payload = await response.json();
+      const payload = await parseJsonResponse(response);
 
       if (!response.ok || payload.code !== 200) {
         throw new Error("City not found. Please try another city.");
@@ -104,7 +119,7 @@ export default function PrayerTimeFinder() {
         `https://api.aladhan.com/v1/timings/${day}-${month}-${year}?latitude=${lat}&longitude=${lon}&method=2`
       ); 
 
-      const payload = await response.json(); 
+      const payload = await parseJsonResponse(response); 
 
       if (!response.ok || payload.code !== 200) {
         throw new Error("Failed to fetch prayer times for your location.");
