@@ -7,6 +7,7 @@ export default function PrayerTimeFinder() {
   const [error, setError] = useState("");
   const [userLocation, setUserLocation] = useState(null); 
   const [locationLabel, setLocationLabel] = useState("");
+  const [lastRequest, setLastRequest] = useState(null);
 
   useEffect(() => {
     if (!navigator.geolocation) {
@@ -75,17 +76,21 @@ export default function PrayerTimeFinder() {
   };
 
   const fetchPrayerTimes = async (cityName) => {
-    if (!cityName.trim()) {
+    const trimmedCity = cityName.trim();
+
+    if (!trimmedCity) {
       setError("Please enter a city name."); 
       return;
     }
+
+    setLastRequest({ type: "city", cityName: trimmedCity });
 
     setLoading(true);
     setError("");
 
     try {
       const response = await fetch(
-        `https://api.aladhan.com/v1/timingsByCity?city=${encodeURIComponent(cityName)}&country=&method=2`
+        `https://api.aladhan.com/v1/timingsByCity?city=${encodeURIComponent(trimmedCity)}&country=&method=2`
       );
       const payload = await parseJsonResponse(response);
 
@@ -94,7 +99,7 @@ export default function PrayerTimeFinder() {
       }
 
       setPrayerTimes(payload.data);
-      setLocationLabel(cityName.trim());
+      setLocationLabel(trimmedCity);
       setCity("");
     } catch (requestError) {
       setError(requestError.message || "Failed to fetch prayer times.");
@@ -106,6 +111,7 @@ export default function PrayerTimeFinder() {
   };
 
   const fetchPrayerTimesByCoordinates = async (lat, lon) => {
+    setLastRequest({ type: "coords", lat, lon });
     setLoading(true); 
     setError("");
 
@@ -144,6 +150,21 @@ export default function PrayerTimeFinder() {
   const handleKeyDown = (event) => {
     if (event.key === "Enter") {
       handleGetPrayerTimes();
+    }
+  };
+
+  const handleRetry = () => {
+    if (!lastRequest || loading) {
+      return;
+    }
+
+    if (lastRequest.type === "city") {
+      fetchPrayerTimes(lastRequest.cityName);
+      return;
+    }
+
+    if (lastRequest.type === "coords") {
+      fetchPrayerTimesByCoordinates(lastRequest.lat, lastRequest.lon);
     }
   };
 
@@ -203,6 +224,15 @@ export default function PrayerTimeFinder() {
       {error && (
         <div className="surface-card rounded-2xl border-l-4 border-red-500 bg-red-50 p-4">
           <p className="text-sm font-medium text-red-700">{error}</p>
+          {lastRequest && (
+            <button
+              onClick={handleRetry}
+              disabled={loading}
+              className="mt-3 rounded-md bg-red-600 px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {loading ? "Retrying..." : "Retry"}
+            </button>
+          )}
         </div>
       )}
 
