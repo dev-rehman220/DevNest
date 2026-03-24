@@ -33,6 +33,32 @@ export default function PrayerTimeFinder() {
     return rawLabel.replaceAll("_", " ");
   };
 
+  const resolveLocationLabel = async (lat, lon) => {
+    try {
+      const response = await fetch(
+        `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`
+      );
+
+      if (!response.ok) {
+        return "";
+      }
+
+      const payload = await response.json();
+
+      const cityName = payload.city || payload.locality || payload.localityInfo?.administrative?.[2]?.name || "";
+      const regionName = payload.principalSubdivision || payload.countryName || "";
+
+      if (cityName && regionName && cityName !== regionName) {
+        return `${cityName}, ${regionName}`;
+      }
+
+      return cityName || regionName || "";
+    } catch (locationError) {
+      console.log("Reverse geocoding failed:", locationError);
+      return "";
+    }
+  };
+
   const fetchPrayerTimes = async (cityName) => {
     if (!cityName.trim()) {
       setError("Please enter a city name."); 
@@ -85,8 +111,9 @@ export default function PrayerTimeFinder() {
       }
 
       setPrayerTimes(payload.data);
+      const resolvedLabel = await resolveLocationLabel(lat, lon);
       const timezone = payload.data?.meta?.timezone || "";
-      setLocationLabel(extractLocationFromTimezone(timezone));
+      setLocationLabel(resolvedLabel || extractLocationFromTimezone(timezone));
     } catch (requestError) {
       console.log("Error fetching by coordinates:", requestError);
       setError("Unable to auto-fetch location timings. Try searching by city.");
@@ -105,8 +132,25 @@ export default function PrayerTimeFinder() {
     }
   };
 
-  const cleanTime = (timeValue = "") => {
-    return timeValue.split(" ")[0] || "--:--"; 
+  const formatToLocal12Hour = (timeValue = "") => {
+    const rawTime = timeValue.split(" ")[0] || "";
+    const [hoursPart, minutesPart] = rawTime.split(":");
+
+    const hours = Number(hoursPart);
+    const minutes = Number(minutesPart);
+
+    if (!Number.isInteger(hours) || !Number.isInteger(minutes)) {
+      return "--:--";
+    }
+
+    const localDate = new Date();
+    localDate.setHours(hours, minutes, 0, 0);
+
+    return localDate.toLocaleTimeString(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
   };
 
   return (
@@ -156,32 +200,32 @@ export default function PrayerTimeFinder() {
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
             <div className="rounded-lg border border-teal-200 bg-teal-50 p-4">
               <p className="text-sm font-semibold text-teal-700">Fajr</p>
-              <p className="text-2xl font-bold text-gray-900">{cleanTime(prayerTimes.timings.Fajr)}</p>
+              <p className="text-2xl font-bold text-gray-900">{formatToLocal12Hour(prayerTimes.timings.Fajr)}</p>
             </div>
 
             <div className="rounded-lg border border-orange-200 bg-orange-50 p-4">
               <p className="text-sm font-semibold text-orange-700">Sunrise</p>
-              <p className="text-2xl font-bold text-gray-900">{cleanTime(prayerTimes.timings.Sunrise)}</p>
+              <p className="text-2xl font-bold text-gray-900">{formatToLocal12Hour(prayerTimes.timings.Sunrise)}</p>
             </div>
 
             <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4">
               <p className="text-sm font-semibold text-yellow-700">Dhuhr</p>
-              <p className="text-2xl font-bold text-gray-900">{cleanTime(prayerTimes.timings.Dhuhr)}</p>
+              <p className="text-2xl font-bold text-gray-900">{formatToLocal12Hour(prayerTimes.timings.Dhuhr)}</p>
             </div>
 
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
               <p className="text-sm font-semibold text-amber-700">Asr</p>
-              <p className="text-2xl font-bold text-gray-900">{cleanTime(prayerTimes.timings.Asr)}</p>
+              <p className="text-2xl font-bold text-gray-900">{formatToLocal12Hour(prayerTimes.timings.Asr)}</p>
             </div>
 
             <div className="rounded-lg border border-purple-200 bg-purple-50 p-4">
               <p className="text-sm font-semibold text-purple-700">Maghrib</p>
-              <p className="text-2xl font-bold text-gray-900">{cleanTime(prayerTimes.timings.Maghrib)}</p>
+              <p className="text-2xl font-bold text-gray-900">{formatToLocal12Hour(prayerTimes.timings.Maghrib)}</p>
             </div>
 
             <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4">
               <p className="text-sm font-semibold text-indigo-700">Isha</p>
-              <p className="text-2xl font-bold text-gray-900">{cleanTime(prayerTimes.timings.Isha)}</p>
+              <p className="text-2xl font-bold text-gray-900">{formatToLocal12Hour(prayerTimes.timings.Isha)}</p>
             </div>
           </div>
 
